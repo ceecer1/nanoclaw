@@ -42,6 +42,7 @@ export interface ContainerInput {
   isScheduledTask?: boolean;
   assistantName?: string;
   imageAttachments?: Array<{ relativePath: string; mediaType: string }>;
+  model?: string;
 }
 
 export interface ContainerOutput {

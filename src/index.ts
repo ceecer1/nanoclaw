@@ -185,6 +185,24 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   const prompt = formatMessages(missedMessages, TIMEZONE);
   const imageAttachments = parseImageReferences(missedMessages);
 
+  // Model selection: parse [sonnet] or [opus] prefix from the last user message
+  const MODEL_ALIASES: Record<string, string> = {
+    sonnet: 'claude-sonnet-4-6',
+    'sonnet-4-6': 'claude-sonnet-4-6',
+    opus: 'claude-opus-4-6',
+    'opus-4-6': 'claude-opus-4-6',
+    haiku: 'claude-haiku-4-5-20251001',
+  };
+  let selectedModel: string | undefined;
+  const lastUserMsg = [...missedMessages].reverse().find((m) => !m.is_from_me);
+  if (lastUserMsg) {
+    const match = lastUserMsg.content.match(/^\[([a-z0-9-]+)\]\s*/i);
+    if (match) {
+      const alias = match[1].toLowerCase();
+      selectedModel = MODEL_ALIASES[alias];
+    }
+  }
+
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
   const previousCursor = lastAgentTimestamp[chatJid] || '';
@@ -220,6 +238,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     prompt,
     chatJid,
     imageAttachments,
+    selectedModel,
     async (result) => {
       // Streaming output callback — called for each agent result
       if (result.result) {
@@ -282,6 +301,7 @@ async function runAgent(
   prompt: string,
   chatJid: string,
   imageAttachments: Array<{ relativePath: string; mediaType: string }>,
+  model?: string,
   onOutput?: (output: ContainerOutput) => Promise<void>,
 ): Promise<'success' | 'error'> {
   const isMain = group.isMain === true;
@@ -334,6 +354,7 @@ async function runAgent(
         isMain,
         assistantName: ASSISTANT_NAME,
         ...(imageAttachments.length > 0 && { imageAttachments }),
+        ...(model && { model }),
       },
       (proc, containerName) =>
         queue.registerProcess(chatJid, proc, containerName, group.folder),
