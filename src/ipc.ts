@@ -4,7 +4,7 @@ import path from 'path';
 import { CronExpressionParser } from 'cron-parser';
 
 import { DATA_DIR, IPC_POLL_INTERVAL, TIMEZONE } from './config.js';
-import { sendPoolMessage } from './channels/telegram.js';
+import { sendPoolMessage, sendPoolPhoto, sendMainPhoto } from './channels/telegram.js';
 import { AvailableGroup } from './container-runner.js';
 import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
 import { isValidGroupFolder } from './group-folder.js';
@@ -99,6 +99,37 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   logger.warn(
                     { chatJid: data.chatJid, sourceGroup },
                     'Unauthorized IPC message attempt blocked',
+                  );
+                }
+              } else if (data.type === 'photo' && data.chatJid && data.filePath) {
+                const targetGroup = registeredGroups[data.chatJid];
+                if (
+                  isMain ||
+                  (targetGroup && targetGroup.folder === sourceGroup)
+                ) {
+                  if (data.chatJid.startsWith('tg:')) {
+                    if (data.sender) {
+                      await sendPoolPhoto(
+                        data.chatJid,
+                        data.filePath,
+                        data.caption,
+                        data.sender,
+                        sourceGroup,
+                      );
+                    } else {
+                      await sendMainPhoto(data.chatJid, data.filePath, data.caption);
+                    }
+                    logger.info(
+                      { chatJid: data.chatJid, sourceGroup, filePath: data.filePath },
+                      'IPC photo sent',
+                    );
+                  } else {
+                    logger.warn({ chatJid: data.chatJid }, 'Photo sending not supported for this channel');
+                  }
+                } else {
+                  logger.warn(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'Unauthorized IPC photo attempt blocked',
                   );
                 }
               }

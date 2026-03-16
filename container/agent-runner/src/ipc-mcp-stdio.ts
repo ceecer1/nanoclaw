@@ -63,6 +63,42 @@ server.tool(
 );
 
 server.tool(
+  'send_photo',
+  "Send an image/screenshot file to the user in the chat. The file must exist in /workspace/group. Use this after taking a screenshot with agent-browser or saving an image.",
+  {
+    file_path: z.string().describe('Path to the image file, relative to /workspace/group (e.g. "screenshot.png") or absolute (e.g. "/workspace/group/screenshot.png")'),
+    caption: z.string().optional().describe('Optional caption to send with the image'),
+    sender: z.string().optional().describe('Your role/identity name (e.g. "Tester"). When set, photo appears from a dedicated bot in Telegram.'),
+  },
+  async (args) => {
+    const absPath = args.file_path.startsWith('/')
+      ? args.file_path
+      : path.join('/workspace/group', args.file_path);
+
+    if (!fs.existsSync(absPath)) {
+      return {
+        content: [{ type: 'text' as const, text: `File not found: ${absPath}` }],
+        isError: true,
+      };
+    }
+
+    const data: Record<string, string | undefined> = {
+      type: 'photo',
+      chatJid,
+      filePath: absPath,
+      caption: args.caption,
+      sender: args.sender || undefined,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    };
+
+    writeIpcFile(MESSAGES_DIR, data);
+
+    return { content: [{ type: 'text' as const, text: 'Photo queued for sending.' }] };
+  },
+);
+
+server.tool(
   'schedule_task',
   `Schedule a recurring or one-time task. The task will run as a full agent with access to all tools. Returns the task ID for future reference. To modify an existing task, use update_task instead.
 

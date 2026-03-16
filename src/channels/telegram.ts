@@ -3,7 +3,7 @@ import https from 'https';
 import path from 'path';
 import { pipeline } from 'stream/promises';
 import { createWriteStream } from 'fs';
-import { Api, Bot } from 'grammy';
+import { Api, Bot, InputFile } from 'grammy';
 
 import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
 import { readEnvFile } from '../env.js';
@@ -123,6 +123,69 @@ export async function sendPoolMessage(
     );
   } catch (err) {
     logger.error({ chatId, sender, err }, 'Failed to send pool message');
+  }
+}
+
+export async function sendPoolPhoto(
+  chatId: string,
+  filePath: string,
+  caption: string | undefined,
+  sender: string | undefined,
+  groupFolder: string,
+): Promise<void> {
+  const numericId = chatId.replace(/^tg:/, '');
+  const inputFile = new InputFile(filePath);
+
+  // Use pool bot if sender specified and pool available
+  if (sender && poolApis.length > 0) {
+    const key = `${groupFolder}:${sender}`;
+    let idx = senderBotMap.get(key);
+    if (idx === undefined) {
+      idx = nextPoolIndex % poolApis.length;
+      nextPoolIndex++;
+      senderBotMap.set(key, idx);
+      try {
+        await poolApis[idx].setMyName(sender);
+        await new Promise((r) => setTimeout(r, 2000));
+      } catch (err) {
+        logger.warn({ sender, err }, 'Failed to rename pool bot for photo');
+      }
+    }
+    try {
+      await poolApis[idx].sendPhoto(numericId, inputFile, caption ? { caption } : undefined);
+      logger.info({ chatId, sender, poolIndex: idx }, 'Pool photo sent');
+    } catch (err) {
+      logger.error({ chatId, sender, err }, 'Failed to send pool photo');
+    }
+    return;
+  }
+
+  // Fall back — stored on channel instance, so we export a setter
+  logger.warn({ chatId }, 'sendPoolPhoto called but no pool/main bot available');
+}
+
+// Setter so IPC handler can send photos via the main bot
+let _mainBotApi: Api | null = null;
+export function setMainBotApi(api: Api): void {
+  _mainBotApi = api;
+}
+
+export async function sendMainPhoto(
+  chatId: string,
+  filePath: string,
+  caption?: string,
+): Promise<void> {
+  if (!_mainBotApi) {
+    logger.warn('sendMainPhoto: main bot API not set');
+    return;
+  }
+  try {
+    const numericId = chatId.replace(/^tg:/, '');
+    const inputFile = new InputFile(filePath);
+    await _mainBotApi.sendPhoto(numericId, inputFile, caption ? { caption } : undefined);
+    logger.info({ chatId }, 'Main bot photo sent');
+  } catch (err) {
+    logger.error({ chatId, err }, 'Failed to send main bot photo');
   }
 }
 
@@ -311,11 +374,17 @@ export class TelegramChannel implements Channel {
           const caption = ctx.message.caption || '';
           const pdfRef = `[PDF: attachments/${filename} (${sizeKB}KB)]\nUse: pdf-reader extract attachments/${filename}`;
           const content = caption ? `${caption}\n\n${pdfRef}` : pdfRef;
-          logger.info({ chatJid, filename }, 'Downloaded Telegram PDF attachment');
+          logger.info(
+            { chatJid, filename },
+            'Downloaded Telegram PDF attachment',
+          );
           storeNonText(ctx, content);
           return;
         } catch (err) {
-          logger.warn({ err, chatJid }, 'Failed to download Telegram PDF attachment');
+          logger.warn(
+            { err, chatJid },
+            'Failed to download Telegram PDF attachment',
+          );
         }
       }
 
@@ -341,6 +410,7 @@ export class TelegramChannel implements Channel {
             { username: botInfo.username, id: botInfo.id },
             'Telegram bot connected',
           );
+          setMainBotApi(this.bot!.api);
           console.log(`\n  Telegram bot: @${botInfo.username}`);
           console.log(
             `  Send /chatid to the bot to get a chat's registration ID\n`,
