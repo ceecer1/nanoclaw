@@ -4,26 +4,29 @@
 FROM node:22-slim
 
 # Install system dependencies for Chromium
-RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-liberation \
-    fonts-noto-cjk \
-    fonts-noto-color-emoji \
-    libgbm1 \
-    libnss3 \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libasound2 \
-    libpangocairo-1.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxshmfence1 \
-    curl \
-    git \
+RUN echo 'Acquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99fixbadproxy \
+    && for i in 1 2 3 4 5; do \
+         apt-get clean && apt-get update && apt-get install -y \
+             chromium \
+             fonts-liberation \
+             fonts-noto-cjk \
+             fonts-noto-color-emoji \
+             libgbm1 \
+             libnss3 \
+             libatk-bridge2.0-0 \
+             libgtk-3-0 \
+             libx11-xcb1 \
+             libxcomposite1 \
+             libxdamage1 \
+             libxrandr2 \
+             libpangocairo-1.0-0 \
+             libcups2 \
+             libdrm2 \
+             libxshmfence1 \
+             curl \
+             git \
+         && break || { echo "apt attempt $i failed, retrying..."; sleep 2; }; \
+       done \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Chromium path for agent-browser

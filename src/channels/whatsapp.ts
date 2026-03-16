@@ -1,4 +1,5 @@
 import { exec } from 'child_process';
+import { readEnvFile } from '../env.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -211,7 +212,11 @@ export class WhatsAppChannel implements Channel {
                 const buffer = await downloadMediaMessage(msg, 'buffer', {});
                 const groupDir = path.join(GROUPS_DIR, groups[chatJid].folder);
                 const caption = normalized?.imageMessage?.caption ?? '';
-                const result = await processImage(buffer as Buffer, groupDir, caption);
+                const result = await processImage(
+                  buffer as Buffer,
+                  groupDir,
+                  caption,
+                );
                 if (result) {
                   content = result.content;
                 }
@@ -416,4 +421,9 @@ export class WhatsAppChannel implements Channel {
   }
 }
 
-registerChannel('whatsapp', (opts: ChannelOpts) => new WhatsAppChannel(opts));
+registerChannel('whatsapp', (opts: ChannelOpts) => {
+  const env = readEnvFile(['WHATSAPP_ENABLED']);
+  const enabled = process.env.WHATSAPP_ENABLED ?? env.WHATSAPP_ENABLED ?? 'true';
+  if (enabled === 'false') return null;
+  return new WhatsAppChannel(opts);
+});
