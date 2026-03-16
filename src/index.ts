@@ -176,8 +176,9 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     const allowlistCfg = loadSenderAllowlist();
     const hasTrigger = missedMessages.some(
       (m) =>
-        TRIGGER_PATTERN.test(m.content.trim()) &&
-        (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+        TRIGGER_PATTERN.test(
+          m.content.trim().replace(/^\[[a-z0-9-]+\]\s*/i, ''),
+        ) && (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
     );
     if (!hasTrigger) return true;
   }
@@ -437,7 +438,9 @@ async function startMessageLoop(): Promise<void> {
             const allowlistCfg = loadSenderAllowlist();
             const hasTrigger = groupMessages.some(
               (m) =>
-                TRIGGER_PATTERN.test(m.content.trim()) &&
+                TRIGGER_PATTERN.test(
+                  m.content.trim().replace(/^\[[a-z0-9-]+\]\s*/i, ''),
+                ) &&
                 (m.is_from_me ||
                   isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
             );
@@ -658,6 +661,12 @@ async function main(): Promise<void> {
       const channel = findChannel(channels, jid);
       if (!channel) throw new Error(`No channel for JID: ${jid}`);
       return channel.sendMessage(jid, text);
+    },
+    sendPhoto: (jid, filePath, caption) => {
+      const channel = findChannel(channels, jid);
+      if (!channel) throw new Error(`No channel for JID: ${jid}`);
+      if (!channel.sendPhoto) throw new Error(`Channel does not support sendPhoto for JID: ${jid}`);
+      return channel.sendPhoto(jid, filePath, caption);
     },
     registeredGroups: () => registeredGroups,
     registerGroup,

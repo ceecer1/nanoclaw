@@ -1,4 +1,8 @@
+import fs from 'fs';
+import path from 'path';
+
 import {
+  AttachmentBuilder,
   Client,
   Events,
   GatewayIntentBits,
@@ -235,6 +239,29 @@ export class DiscordChannel implements Channel {
       this.client.destroy();
       this.client = null;
       logger.info('Discord bot stopped');
+    }
+  }
+
+  async sendPhoto(jid: string, filePath: string, caption?: string): Promise<void> {
+    if (!this.client) {
+      logger.warn('Discord client not initialized');
+      return;
+    }
+    try {
+      const channelId = jid.replace(/^dc:/, '');
+      const channel = await this.client.channels.fetch(channelId);
+      if (!channel || !('send' in channel)) {
+        logger.warn({ jid }, 'Discord channel not found or not text-based');
+        return;
+      }
+      const attachment = new AttachmentBuilder(filePath, { name: path.basename(filePath) });
+      await (channel as TextChannel).send({
+        files: [attachment],
+        ...(caption && { content: caption }),
+      });
+      logger.info({ jid, filePath }, 'Discord photo sent');
+    } catch (err) {
+      logger.error({ jid, filePath, err }, 'Failed to send Discord photo');
     }
   }
 

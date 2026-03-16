@@ -152,7 +152,11 @@ export async function sendPoolPhoto(
       }
     }
     try {
-      await poolApis[idx].sendPhoto(numericId, inputFile, caption ? { caption } : undefined);
+      await poolApis[idx].sendPhoto(
+        numericId,
+        inputFile,
+        caption ? { caption } : undefined,
+      );
       logger.info({ chatId, sender, poolIndex: idx }, 'Pool photo sent');
     } catch (err) {
       logger.error({ chatId, sender, err }, 'Failed to send pool photo');
@@ -161,7 +165,10 @@ export async function sendPoolPhoto(
   }
 
   // Fall back — stored on channel instance, so we export a setter
-  logger.warn({ chatId }, 'sendPoolPhoto called but no pool/main bot available');
+  logger.warn(
+    { chatId },
+    'sendPoolPhoto called but no pool/main bot available',
+  );
 }
 
 // Setter so IPC handler can send photos via the main bot
@@ -182,7 +189,11 @@ export async function sendMainPhoto(
   try {
     const numericId = chatId.replace(/^tg:/, '');
     const inputFile = new InputFile(filePath);
-    await _mainBotApi.sendPhoto(numericId, inputFile, caption ? { caption } : undefined);
+    await _mainBotApi.sendPhoto(
+      numericId,
+      inputFile,
+      caption ? { caption } : undefined,
+    );
     logger.info({ chatId }, 'Main bot photo sent');
   } catch (err) {
     logger.error({ chatId, err }, 'Failed to send main bot photo');

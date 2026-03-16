@@ -429,7 +429,8 @@ export class WhatsAppChannel implements Channel {
 
 registerChannel('whatsapp', (opts: ChannelOpts) => {
   const env = readEnvFile(['WHATSAPP_ENABLED']);
-  const enabled = process.env.WHATSAPP_ENABLED ?? env.WHATSAPP_ENABLED ?? 'true';
+  const enabled =
+    process.env.WHATSAPP_ENABLED ?? env.WHATSAPP_ENABLED ?? 'true';
   if (enabled === 'false') return null;
   return new WhatsAppChannel(opts);
 });
