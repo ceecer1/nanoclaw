@@ -30,9 +30,17 @@ RUN echo 'Acquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99fixbadprox
        done \
     && rm -rf /var/lib/apt/lists/*
 
+# Chromium wrapper — adds flags required for headless rendering in Docker:
+# --no-sandbox: required for non-root or unprivileged containers
+# --disable-gpu: no GPU in container, prevents blank screenshots
+# --disable-dev-shm-usage: /dev/shm is small in Docker, use /tmp instead
+# --disable-software-rasterizer: avoids fallback to broken SW rasterizer
+RUN printf '#!/bin/bash\nexec /usr/bin/chromium --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer "$@"\n' \
+    > /usr/local/bin/chromium-headless && chmod +x /usr/local/bin/chromium-headless
+
 # Set Chromium path for agent-browser
-ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
-ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/local/bin/chromium-headless
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/local/bin/chromium-headless
 
 # Install agent-browser and claude-code globally
 RUN npm install -g agent-browser @anthropic-ai/claude-code
