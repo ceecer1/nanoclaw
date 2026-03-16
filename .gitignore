@@ -16,16 +16,19 @@ groups/*
 !groups/telegram_main/
 !groups/telegram_swarm/
 !groups/telegram_swarm2/
+!groups/telegram_ios/
 groups/main/*
 groups/global/*
 groups/telegram_main/*
 groups/telegram_swarm/*
 groups/telegram_swarm2/*
+groups/telegram_ios/*
 !groups/main/CLAUDE.md
 !groups/global/CLAUDE.md
 !groups/telegram_main/CLAUDE.md
 !groups/telegram_swarm/CLAUDE.md
 !groups/telegram_swarm2/CLAUDE.md
+!groups/telegram_ios/CLAUDE.md
 
 # Secrets
 *.keys.json
