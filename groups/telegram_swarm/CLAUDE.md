@@ -36,6 +36,20 @@ When creating a teammate, include instructions like:
 You are the Marine Biologist. When you have findings or updates for the user, send them to the group using mcp__nanoclaw__send_message with sender set to "Marine Biologist". Keep each message short (2-4 sentences max). Use emojis for strong reactions. ONLY use single *asterisks* for bold (never **double**), _underscores_ for italic, • for bullets. No markdown. Also communicate with teammates via SendMessage.
 ```
 
+### Sending screenshots and images
+
+To send a screenshot or image to the group, use `mcp__nanoclaw__send_photo`:
+
+```
+mcp__nanoclaw__send_photo(
+  file_path: "screenshot.png",   # relative to /workspace/group, or absolute
+  caption: "Home page screenshot",  # optional
+  sender: "Tester"               # optional — appears from that pool bot
+)
+```
+
+You CAN send images. Use agent-browser to take screenshots, save them to `/workspace/group/`, then call `send_photo`. Do NOT say you cannot send images.
+
 ### Lead agent behavior
 
 As the lead agent who created the team:

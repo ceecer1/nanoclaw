@@ -18,6 +18,12 @@ Your output is sent to the user or group.
 
 You also have `mcp__nanoclaw__send_message` which sends a message immediately while you're still working. This is useful when you want to acknowledge a request before starting longer work.
 
+You also have `mcp__nanoclaw__send_photo` which sends an image or screenshot to the chat. Use it after taking a screenshot with agent-browser:
+1. Take screenshot: `agent-browser screenshot screenshot.png` (saves to `/workspace/group/screenshot.png`)
+2. Send it: `mcp__nanoclaw__send_photo(file_path: "screenshot.png", caption: "optional caption")`
+
+You CAN send images. Do NOT say you cannot send images or screenshots.
+
 ### Internal thoughts
 
 If part of your output is internal reasoning rather than something for the user, wrap it in `<internal>` tags:
