@@ -1,8 +1,13 @@
+import fs from 'fs';
 import https from 'https';
+import path from 'path';
+import { pipeline } from 'stream/promises';
+import { createWriteStream } from 'fs';
 import { Api, Bot } from 'grammy';
 
 import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
 import { readEnvFile } from '../env.js';
+import { resolveGroupFolderPath } from '../group-folder.js';
 import { logger } from '../logger.js';
 import { registerChannel, ChannelOpts } from './registry.js';
 import {
@@ -283,8 +288,37 @@ export class TelegramChannel implements Channel {
     this.bot.on('message:video', (ctx) => storeNonText(ctx, '[Video]'));
     this.bot.on('message:voice', (ctx) => storeNonText(ctx, '[Voice message]'));
     this.bot.on('message:audio', (ctx) => storeNonText(ctx, '[Audio]'));
-    this.bot.on('message:document', (ctx) => {
-      const name = ctx.message.document?.file_name || 'file';
+    this.bot.on('message:document', async (ctx) => {
+      const doc = ctx.message.document;
+      const name = doc?.file_name || 'file';
+      const chatJid = `tg:${ctx.chat.id}`;
+      const group = this.opts.registeredGroups()[chatJid];
+
+      // Download PDFs for agent use
+      if (doc && doc.mime_type === 'application/pdf' && group) {
+        try {
+          const fileInfo = await this.bot!.api.getFile(doc.file_id);
+          const fileUrl = `https://api.telegram.org/file/bot${this.botToken}/${fileInfo.file_path}`;
+          const groupDir = resolveGroupFolderPath(group.folder);
+          const attachmentsDir = path.join(groupDir, 'attachments');
+          fs.mkdirSync(attachmentsDir, { recursive: true });
+          const filename = `${Date.now()}-${name}`;
+          const destPath = path.join(attachmentsDir, filename);
+          const res = await fetch(fileUrl);
+          if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+          await pipeline(res.body as any, createWriteStream(destPath));
+          const sizeKB = Math.round((doc.file_size || 0) / 1024);
+          const caption = ctx.message.caption || '';
+          const pdfRef = `[PDF: attachments/${filename} (${sizeKB}KB)]\nUse: pdf-reader extract attachments/${filename}`;
+          const content = caption ? `${caption}\n\n${pdfRef}` : pdfRef;
+          logger.info({ chatJid, filename }, 'Downloaded Telegram PDF attachment');
+          storeNonText(ctx, content);
+          return;
+        } catch (err) {
+          logger.warn({ err, chatJid }, 'Failed to download Telegram PDF attachment');
+        }
+      }
+
       storeNonText(ctx, `[Document: ${name}]`);
     });
     this.bot.on('message:sticker', (ctx) => {

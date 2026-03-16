@@ -28,6 +28,7 @@ import {
   RegisteredGroup,
 } from '../types.js';
 import { registerChannel, ChannelOpts } from './registry.js';
+import { readEnvFile } from '../env.js';
 
 const GROUP_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -221,7 +222,7 @@ export class WhatsAppChannel implements Channel {
                 fs.mkdirSync(attachDir, { recursive: true });
                 const filename = path.basename(
                   normalized.documentMessage.fileName ||
-                  `doc-${Date.now()}.pdf`,
+                    `doc-${Date.now()}.pdf`,
                 );
                 const filePath = path.join(attachDir, filename);
                 fs.writeFileSync(filePath, buffer as Buffer);
@@ -426,4 +427,9 @@ export class WhatsAppChannel implements Channel {
   }
 }
 
-registerChannel('whatsapp', (opts: ChannelOpts) => new WhatsAppChannel(opts));
+registerChannel('whatsapp', (opts: ChannelOpts) => {
+  const env = readEnvFile(['WHATSAPP_ENABLED']);
+  const enabled = process.env.WHATSAPP_ENABLED ?? env.WHATSAPP_ENABLED ?? 'true';
+  if (enabled === 'false') return null;
+  return new WhatsAppChannel(opts);
+});
