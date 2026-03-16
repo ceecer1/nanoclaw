@@ -3,11 +3,14 @@
 
 FROM node:22-slim
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install system dependencies for Chromium and PDF tools
 RUN echo 'Acquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99fixbadproxy \
     && for i in 1 2 3 4 5; do \
-         apt-get clean && apt-get update && apt-get install -y \
-             chromium \
+         apt-get clean && apt-get update && apt-get install -y --no-install-recommends \
+             chromium-headless-shell \
+             chromium-sandbox \
              fonts-liberation \
              fonts-noto-cjk \
              fonts-noto-color-emoji \
@@ -28,14 +31,15 @@ RUN echo 'Acquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99fixbadprox
              poppler-utils \
          && break || { echo "apt attempt $i failed, retrying..."; sleep 2; }; \
        done \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && test -f /usr/bin/chromium-headless-shell || { echo "ERROR: chromium-headless-shell not found after install"; exit 1; }
 
 # Chromium wrapper — adds flags required for headless rendering in Docker:
 # --no-sandbox: required for non-root or unprivileged containers
 # --disable-gpu: no GPU in container, prevents blank screenshots
 # --disable-dev-shm-usage: /dev/shm is small in Docker, use /tmp instead
 # --disable-software-rasterizer: avoids fallback to broken SW rasterizer
-RUN printf '#!/bin/bash\nexec /usr/bin/chromium --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer "$@"\n' \
+RUN printf '#!/bin/bash\nexec /usr/bin/chromium-headless-shell --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer "$@"\n' \
     > /usr/local/bin/chromium-headless && chmod +x /usr/local/bin/chromium-headless
 
 # Set Chromium path for agent-browser
