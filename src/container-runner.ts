@@ -50,6 +50,21 @@ export interface ContainerOutput {
   result: string | null;
   newSessionId?: string;
   error?: string;
+  rateLimited?: boolean;
+}
+
+const RATE_LIMIT_PATTERNS = [
+  /rate.?limit/i,
+  /429/,
+  /too many requests/i,
+  /overloaded/i,
+  /quota.?exceeded/i,
+  /token.?limit/i,
+  /context.?length.?exceeded/i,
+];
+
+function isRateLimitError(text: string): boolean {
+  return RATE_LIMIT_PATTERNS.some((p) => p.test(text));
 }
 
 interface VolumeMount {
@@ -556,10 +571,12 @@ export async function runContainerAgent(
           'Container exited with error',
         );
 
+        const errSnippet = stderr.slice(-500) + stdout.slice(-500);
         resolve({
           status: 'error',
           result: null,
           error: `Container exited with code ${code}: ${stderr.slice(-200)}`,
+          rateLimited: isRateLimitError(errSnippet),
         });
         return;
       }

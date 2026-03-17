@@ -6,6 +6,7 @@ import {
   CREDENTIAL_PROXY_PORT,
   IDLE_TIMEOUT,
   POLL_INTERVAL,
+  RATE_LIMIT_RETRY_MS,
   TELEGRAM_BOT_POOL,
   TIMEZONE,
   TRIGGER_PATTERN,
@@ -178,7 +179,8 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       (m) =>
         TRIGGER_PATTERN.test(
           m.content.trim().replace(/^\[[a-z0-9-]+\]\s*/i, ''),
-        ) && (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+        ) &&
+        (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
     );
     if (!hasTrigger) return true;
   }
@@ -274,7 +276,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
 
-  if (output === 'error' || hadError) {
+  if (output === 'error' || output === 'rate_limited' || hadError) {
     // If we already sent output to the user, don't roll back the cursor —
     // the user got their response and re-processing would send duplicates.
     if (outputSentToUser) {
@@ -287,6 +289,24 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     // Roll back cursor so retries can re-process these messages
     lastAgentTimestamp[chatJid] = previousCursor;
     saveState();
+
+    // Rate-limit: auto-retry after reset window
+    if (output === 'rate_limited') {
+      logger.warn(
+        { group: group.name, retryMs: RATE_LIMIT_RETRY_MS },
+        'Rate limit hit, scheduling auto-retry',
+      );
+      const channel = findChannel(channels, chatJid);
+      await channel
+        ?.sendMessage(
+          chatJid,
+          `⏳ Hit Claude's rate limit. Will retry automatically in ${Math.round(RATE_LIMIT_RETRY_MS / 1000)}s.`,
+        )
+        .catch(() => {});
+      setTimeout(() => queue.enqueueMessageCheck(chatJid), RATE_LIMIT_RETRY_MS);
+      return true;
+    }
+
     logger.warn(
       { group: group.name },
       'Agent error, rolled back message cursor for retry',
@@ -304,7 +324,7 @@ async function runAgent(
   imageAttachments: Array<{ relativePath: string; mediaType: string }>,
   model?: string,
   onOutput?: (output: ContainerOutput) => Promise<void>,
-): Promise<'success' | 'error'> {
+): Promise<'success' | 'error' | 'rate_limited'> {
   const isMain = group.isMain === true;
   const sessionId = sessions[group.folder];
 
@@ -369,10 +389,10 @@ async function runAgent(
 
     if (output.status === 'error') {
       logger.error(
-        { group: group.name, error: output.error },
+        { group: group.name, error: output.error, rateLimited: output.rateLimited },
         'Container agent error',
       );
-      return 'error';
+      return output.rateLimited ? 'rate_limited' : 'error';
     }
 
     return 'success';
@@ -665,7 +685,8 @@ async function main(): Promise<void> {
     sendPhoto: (jid, filePath, caption) => {
       const channel = findChannel(channels, jid);
       if (!channel) throw new Error(`No channel for JID: ${jid}`);
-      if (!channel.sendPhoto) throw new Error(`Channel does not support sendPhoto for JID: ${jid}`);
+      if (!channel.sendPhoto)
+        throw new Error(`Channel does not support sendPhoto for JID: ${jid}`);
       return channel.sendPhoto(jid, filePath, caption);
     },
     registeredGroups: () => registeredGroups,

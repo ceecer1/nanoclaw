@@ -242,7 +242,11 @@ export class DiscordChannel implements Channel {
     }
   }
 
-  async sendPhoto(jid: string, filePath: string, caption?: string): Promise<void> {
+  async sendPhoto(
+    jid: string,
+    filePath: string,
+    caption?: string,
+  ): Promise<void> {
     if (!this.client) {
       logger.warn('Discord client not initialized');
       return;
@@ -254,7 +258,9 @@ export class DiscordChannel implements Channel {
         logger.warn({ jid }, 'Discord channel not found or not text-based');
         return;
       }
-      const attachment = new AttachmentBuilder(filePath, { name: path.basename(filePath) });
+      const attachment = new AttachmentBuilder(filePath, {
+        name: path.basename(filePath),
+      });
       await (channel as TextChannel).send({
         files: [attachment],
         ...(caption && { content: caption }),

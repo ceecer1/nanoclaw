@@ -120,8 +120,13 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   // Translate container-side paths to host paths.
                   // /workspace/group/... → <groups_dir>/<sourceGroup>/...
                   const groupHostDir = resolveGroupFolderPath(sourceGroup);
-                  const hostFilePath = data.filePath.startsWith('/workspace/group/')
-                    ? path.join(groupHostDir, data.filePath.slice('/workspace/group/'.length))
+                  const hostFilePath = data.filePath.startsWith(
+                    '/workspace/group/',
+                  )
+                    ? path.join(
+                        groupHostDir,
+                        data.filePath.slice('/workspace/group/'.length),
+                      )
                     : data.filePath;
 
                   if (data.chatJid.startsWith('tg:')) {
@@ -141,7 +146,11 @@ export function startIpcWatcher(deps: IpcDeps): void {
                       );
                     }
                   } else {
-                    await deps.sendPhoto(data.chatJid, hostFilePath, data.caption);
+                    await deps.sendPhoto(
+                      data.chatJid,
+                      hostFilePath,
+                      data.caption,
+                    );
                   }
                   logger.info(
                     {

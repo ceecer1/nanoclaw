@@ -121,8 +121,30 @@ export async function sendPoolMessage(
       { chatId, sender, poolIndex: idx, length: text.length },
       'Pool message sent',
     );
-  } catch (err) {
-    logger.error({ chatId, sender, err }, 'Failed to send pool message');
+  } catch (err: any) {
+    // Pool bot not in the group yet — fall back to main bot with sender prefix
+    if (err?.error_code === 400 && _mainBotApi) {
+      logger.warn(
+        { chatId, sender },
+        'Pool bot not in group, falling back to main bot',
+      );
+      const numericId = chatId.replace(/^tg:/, '');
+      const MAX_LENGTH = 4096;
+      const prefixed = (chunk: string) => `*${sender}:* ${chunk}`;
+      if (text.length <= MAX_LENGTH - sender.length - 3) {
+        await sendTelegramMessage(_mainBotApi, numericId, prefixed(text));
+      } else {
+        for (let i = 0; i < text.length; i += MAX_LENGTH) {
+          await sendTelegramMessage(
+            _mainBotApi,
+            numericId,
+            prefixed(text.slice(i, i + MAX_LENGTH)),
+          );
+        }
+      }
+    } else {
+      logger.error({ chatId, sender, err }, 'Failed to send pool message');
+    }
   }
 }
 
@@ -158,8 +180,24 @@ export async function sendPoolPhoto(
         caption ? { caption } : undefined,
       );
       logger.info({ chatId, sender, poolIndex: idx }, 'Pool photo sent');
-    } catch (err) {
-      logger.error({ chatId, sender, err }, 'Failed to send pool photo');
+    } catch (err: any) {
+      // Pool bot not in the group yet — fall back to main bot with sender prefix
+      if (err?.error_code === 400 && _mainBotApi) {
+        logger.warn(
+          { chatId, sender },
+          'Pool bot not in group for photo, falling back to main bot',
+        );
+        const prefixedCaption = sender
+          ? `*${sender}:* ${caption || ''}`
+          : caption;
+        await _mainBotApi.sendPhoto(
+          numericId,
+          new InputFile(filePath),
+          prefixedCaption ? { caption: prefixedCaption } : undefined,
+        );
+      } else {
+        logger.error({ chatId, sender, err }, 'Failed to send pool photo');
+      }
     }
     return;
   }
