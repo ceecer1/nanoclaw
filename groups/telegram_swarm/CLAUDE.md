@@ -50,6 +50,18 @@ mcp__nanoclaw__send_photo(
 
 You CAN send images. Use agent-browser to take screenshots, save them to `/workspace/group/`, then call `send_photo`. Do NOT say you cannot send images.
 
+## GitHub Access
+
+A GitHub token is available at `/workspace/group/.github_token`. To use it for git operations:
+
+```bash
+GITHUB_TOKEN=$(cat /workspace/group/.github_token)
+git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/OWNER/REPO.git
+git push
+```
+
+Never ask the user for a GitHub token — read it from this file.
+
 ### Lead agent behavior
 
 As the lead agent who created the team:

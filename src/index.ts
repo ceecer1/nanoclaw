@@ -3,7 +3,9 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
+  CONTAINER_IMAGE,
   CREDENTIAL_PROXY_PORT,
+  DATA_DIR,
   IDLE_TIMEOUT,
   POLL_INTERVAL,
   RATE_LIMIT_RETRY_MS,
@@ -25,6 +27,7 @@ import {
 } from './container-runner.js';
 import {
   cleanupOrphans,
+  ensureContainerImageLoaded,
   ensureContainerRuntimeRunning,
   PROXY_BIND_HOST,
 } from './container-runtime.js';
@@ -389,7 +392,11 @@ async function runAgent(
 
     if (output.status === 'error') {
       logger.error(
-        { group: group.name, error: output.error, rateLimited: output.rateLimited },
+        {
+          group: group.name,
+          error: output.error,
+          rateLimited: output.rateLimited,
+        },
         'Container agent error',
       );
       return output.rateLimited ? 'rate_limited' : 'error';
@@ -525,6 +532,10 @@ function recoverPendingMessages(): void {
 
 function ensureContainerSystemRunning(): void {
   ensureContainerRuntimeRunning();
+  ensureContainerImageLoaded(
+    CONTAINER_IMAGE,
+    path.join(DATA_DIR, 'nanoclaw-agent.tar'),
+  );
   cleanupOrphans();
 }
 

@@ -62,6 +62,41 @@ export function stopContainer(name: string): string {
   return `${CONTAINER_RUNTIME_BIN} stop ${name}`;
 }
 
+/** Load the saved container image from disk if it's not present in Docker. */
+export function ensureContainerImageLoaded(
+  imageName: string,
+  tarPath: string,
+): void {
+  try {
+    execSync(`${CONTAINER_RUNTIME_BIN} image inspect ${imageName}`, {
+      stdio: 'pipe',
+    });
+    logger.debug({ imageName }, 'Container image already present');
+    return;
+  } catch {
+    // Image not found — try loading from tar
+  }
+
+  if (!fs.existsSync(tarPath)) {
+    logger.warn(
+      { imageName, tarPath },
+      'Container image missing and no saved tar found — run ./container/build.sh',
+    );
+    return;
+  }
+
+  logger.info({ imageName, tarPath }, 'Loading container image from tar');
+  try {
+    execSync(`${CONTAINER_RUNTIME_BIN} load -i ${tarPath}`, {
+      stdio: 'pipe',
+      timeout: 120000,
+    });
+    logger.info({ imageName }, 'Container image loaded from tar');
+  } catch (err) {
+    logger.error({ err, tarPath }, 'Failed to load container image from tar');
+  }
+}
+
 /** Ensure the container runtime is running, starting it if needed. */
 export function ensureContainerRuntimeRunning(): void {
   try {
