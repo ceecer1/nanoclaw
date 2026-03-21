@@ -59,7 +59,7 @@ export function readonlyMountArgs(
 
 /** Returns the shell command to stop a container by name. */
 export function stopContainer(name: string): string {
-  return `${CONTAINER_RUNTIME_BIN} stop ${name}`;
+  return `${CONTAINER_RUNTIME_BIN} stop -t 1 ${name}`;
 }
 
 /** Load the saved container image from disk if it's not present in Docker. */
