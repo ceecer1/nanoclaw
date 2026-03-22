@@ -199,13 +199,13 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     'opus-4-6': 'claude-opus-4-6',
     haiku: 'claude-haiku-4-5-20251001',
   };
-  let selectedModel: string | undefined;
+  let selectedModel: string = MODEL_ALIASES['sonnet'];
   const lastUserMsg = [...missedMessages].reverse().find((m) => !m.is_from_me);
   if (lastUserMsg) {
     const match = lastUserMsg.content.match(/^\[([a-z0-9-]+)\]\s*/i);
     if (match) {
       const alias = match[1].toLowerCase();
-      selectedModel = MODEL_ALIASES[alias];
+      selectedModel = MODEL_ALIASES[alias] ?? selectedModel;
     }
   }
 
