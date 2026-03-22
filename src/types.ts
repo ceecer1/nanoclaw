@@ -92,6 +92,8 @@ export interface Channel {
   syncGroups?(force: boolean): Promise<void>;
   // Optional: send a photo/image file to a chat.
   sendPhoto?(jid: string, filePath: string, caption?: string): Promise<void>;
+  // Optional: send a video file to a chat.
+  sendVideo?(jid: string, filePath: string, caption?: string): Promise<void>;
 }
 
 // Callback type that channels use to deliver inbound messages

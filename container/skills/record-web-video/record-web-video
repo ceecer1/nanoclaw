@@ -1,0 +1,96 @@
+#!/usr/bin/env node
+/**
+ * record-web-video — record a Playwright browser session as a .webm video
+ *
+ * Usage:
+ *   record-web-video --url <url> [options]
+ *
+ * Options:
+ *   --url <url>          Page to open (required)
+ *   --output <path>      Output .webm file (default: /workspace/group/recording.webm)
+ *   --width <n>          Viewport width (default: 1280)
+ *   --height <n>         Viewport height (default: 720)
+ *   --wait <ms>          Wait this long after page load before closing (default: 3000)
+ *   --script <js>        Inline Playwright actions to run after page load.
+ *                        The variable `page` is the Playwright Page object.
+ *                        Example: --script "await page.click('#btn'); await page.waitForNavigation();"
+ *   --script-file <path> Path to a .mjs file exporting async function(page) { ... }
+ *
+ * The video is written as .webm. Telegram accepts .webm natively.
+ * To convert to .mp4: ffmpeg -i recording.webm recording.mp4
+ *
+ * Exit codes: 0 = success (prints output path), 1 = error
+ */
+
+import { chromium } from 'playwright';
+import { createRequire } from 'module';
+import { pathToFileURL } from 'url';
+import path from 'path';
+import fs from 'fs';
+
+const args = process.argv.slice(2);
+const get = (flag) => {
+  const i = args.indexOf(flag);
+  return i !== -1 ? args[i + 1] : undefined;
+};
+
+const url = get('--url');
+const output = get('--output') || '/workspace/group/recording.webm';
+const width = parseInt(get('--width') || '1280', 10);
+const height = parseInt(get('--height') || '720', 10);
+const waitMs = parseInt(get('--wait') || '3000', 10);
+const inlineScript = get('--script');
+const scriptFile = get('--script-file');
+
+if (!url) {
+  console.error('Error: --url is required');
+  console.error('Usage: record-web-video --url <url> [--output <file>] [--script "<js>"] [--wait <ms>]');
+  process.exit(1);
+}
+
+const videoDir = path.dirname(path.resolve(output));
+fs.mkdirSync(videoDir, { recursive: true });
+
+const browser = await chromium.launch({
+  executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '/usr/bin/chromium',
+  args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--disable-software-rasterizer'],
+  headless: true,
+});
+
+const context = await browser.newContext({
+  recordVideo: { dir: videoDir, size: { width, height } },
+  viewport: { width, height },
+});
+
+const page = await context.newPage();
+
+try {
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+
+  if (scriptFile) {
+    const mod = await import(pathToFileURL(path.resolve(scriptFile)).href);
+    await mod.default(page);
+  } else if (inlineScript) {
+    const fn = new Function('page', `return (async (page) => { ${inlineScript} })(page)`);
+    await fn(page);
+  } else {
+    await page.waitForTimeout(waitMs);
+  }
+} catch (err) {
+  console.error('Error during page automation:', err.message);
+} finally {
+  const videoPath = await page.video()?.path();
+  await context.close();
+  await browser.close();
+
+  if (videoPath && fs.existsSync(videoPath)) {
+    const resolvedOutput = path.resolve(output);
+    if (videoPath !== resolvedOutput) {
+      fs.renameSync(videoPath, resolvedOutput);
+    }
+    console.log(resolvedOutput);
+  } else {
+    console.error('No video file was produced');
+    process.exit(1);
+  }
+}

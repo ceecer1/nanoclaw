@@ -9,6 +9,8 @@ import {
   sendPoolMessage,
   sendPoolPhoto,
   sendMainPhoto,
+  sendPoolVideo,
+  sendMainVideo,
 } from './channels/telegram.js';
 import { AvailableGroup } from './container-runner.js';
 import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
@@ -19,6 +21,7 @@ import { RegisteredGroup } from './types.js';
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
   sendPhoto: (jid: string, filePath: string, caption?: string) => Promise<void>;
+  sendVideo: (jid: string, filePath: string, caption?: string) => Promise<void>;
   registeredGroups: () => Record<string, RegisteredGroup>;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
   syncGroups: (force: boolean) => Promise<void>;
@@ -165,6 +168,63 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   logger.warn(
                     { chatJid: data.chatJid, sourceGroup },
                     'Unauthorized IPC photo attempt blocked',
+                  );
+                }
+              } else if (
+                data.type === 'video' &&
+                data.chatJid &&
+                data.filePath
+              ) {
+                const targetGroup = registeredGroups[data.chatJid];
+                if (
+                  isMain ||
+                  (targetGroup && targetGroup.folder === sourceGroup)
+                ) {
+                  const groupHostDir = resolveGroupFolderPath(sourceGroup);
+                  const hostFilePath = data.filePath.startsWith(
+                    '/workspace/group/',
+                  )
+                    ? path.join(
+                        groupHostDir,
+                        data.filePath.slice('/workspace/group/'.length),
+                      )
+                    : data.filePath;
+
+                  if (data.chatJid.startsWith('tg:')) {
+                    if (data.sender) {
+                      await sendPoolVideo(
+                        data.chatJid,
+                        hostFilePath,
+                        data.caption,
+                        data.sender,
+                        sourceGroup,
+                      );
+                    } else {
+                      await sendMainVideo(
+                        data.chatJid,
+                        hostFilePath,
+                        data.caption,
+                      );
+                    }
+                  } else {
+                    await deps.sendVideo(
+                      data.chatJid,
+                      hostFilePath,
+                      data.caption,
+                    );
+                  }
+                  logger.info(
+                    {
+                      chatJid: data.chatJid,
+                      sourceGroup,
+                      filePath: data.filePath,
+                    },
+                    'IPC video sent',
+                  );
+                } else {
+                  logger.warn(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'Unauthorized IPC video attempt blocked',
                   );
                 }
               }

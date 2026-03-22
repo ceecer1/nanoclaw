@@ -50,6 +50,43 @@ mcp__nanoclaw__send_photo(
 
 You CAN send images. Use agent-browser to take screenshots, save them to `/workspace/group/`, then call `send_photo`. Do NOT say you cannot send images.
 
+### Recording web page videos
+
+To record a video of a web page (clicking, navigating, filling forms), use `record-web-video`:
+
+```bash
+# Basic: open a page and record for 5 seconds
+record-web-video --url "https://example.com" --output /workspace/group/recording.webm --wait 5000
+
+# With Playwright actions (clicking, navigation, etc.)
+record-web-video \
+  --url "https://example.com" \
+  --output /workspace/group/recording.webm \
+  --script "
+    await page.click('a.nav-link');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+    await page.fill('#search', 'hello');
+    await page.keyboard.press('Enter');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+  "
+
+# For complex workflows, write a script file and pass it with --script-file
+```
+
+After recording, send it with `mcp__nanoclaw__send_video`:
+
+```
+mcp__nanoclaw__send_video(
+  file_path: "recording.webm",
+  caption: "Here's the recording",
+  sender: "Recorder"   # optional
+)
+```
+
+The `--script` value is JavaScript with access to the Playwright `page` object. All standard Playwright APIs work: `page.click()`, `page.fill()`, `page.goto()`, `page.waitForSelector()`, `page.waitForLoadState()`, `page.waitForTimeout()`, `page.screenshot()`, etc.
+
 ## GitHub Access
 
 A GitHub token is available at `/workspace/group/.github_token`. To use it for git operations:

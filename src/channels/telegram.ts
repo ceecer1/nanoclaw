@@ -238,6 +238,84 @@ export async function sendMainPhoto(
   }
 }
 
+export async function sendPoolVideo(
+  chatId: string,
+  filePath: string,
+  caption: string | undefined,
+  sender: string | undefined,
+  groupFolder: string,
+): Promise<void> {
+  const numericId = chatId.replace(/^tg:/, '');
+  const inputFile = new InputFile(filePath);
+
+  if (sender && poolApis.length > 0) {
+    const key = `${groupFolder}:${sender}`;
+    let idx = senderBotMap.get(key);
+    if (idx === undefined) {
+      idx = nextPoolIndex % poolApis.length;
+      nextPoolIndex++;
+      senderBotMap.set(key, idx);
+      try {
+        await poolApis[idx].setMyName(sender);
+        await new Promise((r) => setTimeout(r, 2000));
+      } catch (err) {
+        logger.warn({ sender, err }, 'Failed to rename pool bot for video');
+      }
+    }
+    try {
+      await poolApis[idx].sendVideo(
+        numericId,
+        inputFile,
+        caption ? { caption } : undefined,
+      );
+      logger.info({ chatId, sender, poolIndex: idx }, 'Pool video sent');
+    } catch (err: any) {
+      if (err?.error_code === 400 && _mainBotApi) {
+        logger.warn(
+          { chatId, sender },
+          'Pool bot not in group for video, falling back to main bot',
+        );
+        const prefixedCaption = sender
+          ? `*${sender}:* ${caption || ''}`
+          : caption;
+        await _mainBotApi.sendVideo(
+          numericId,
+          new InputFile(filePath),
+          prefixedCaption ? { caption: prefixedCaption } : undefined,
+        );
+      } else {
+        logger.error({ chatId, sender, err }, 'Failed to send pool video');
+      }
+    }
+    return;
+  }
+
+  logger.warn({ chatId }, 'sendPoolVideo called but no pool/main bot available');
+}
+
+export async function sendMainVideo(
+  chatId: string,
+  filePath: string,
+  caption?: string,
+): Promise<void> {
+  if (!_mainBotApi) {
+    logger.warn('sendMainVideo: main bot API not set');
+    return;
+  }
+  try {
+    const numericId = chatId.replace(/^tg:/, '');
+    const inputFile = new InputFile(filePath);
+    await _mainBotApi.sendVideo(
+      numericId,
+      inputFile,
+      caption ? { caption } : undefined,
+    );
+    logger.info({ chatId }, 'Main bot video sent');
+  } catch (err) {
+    logger.error({ chatId, err }, 'Failed to send main bot video');
+  }
+}
+
 export class TelegramChannel implements Channel {
   name = 'telegram';
 
@@ -522,6 +600,14 @@ export class TelegramChannel implements Channel {
     } catch (err) {
       logger.debug({ jid, err }, 'Failed to send Telegram typing indicator');
     }
+  }
+
+  async sendPhoto(jid: string, filePath: string, caption?: string): Promise<void> {
+    await sendMainPhoto(jid, filePath, caption);
+  }
+
+  async sendVideo(jid: string, filePath: string, caption?: string): Promise<void> {
+    await sendMainVideo(jid, filePath, caption);
   }
 }
 

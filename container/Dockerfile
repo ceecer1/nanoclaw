@@ -9,8 +9,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN echo 'Acquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99fixbadproxy \
     && for i in 1 2 3 4 5; do \
          apt-get clean && apt-get update && apt-get install -y --no-install-recommends \
-             chromium-headless-shell \
+             chromium \
              chromium-sandbox \
+             ffmpeg \
              fonts-liberation \
              fonts-noto-cjk \
              fonts-noto-color-emoji \
@@ -32,22 +33,23 @@ RUN echo 'Acquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99fixbadprox
          && break || { echo "apt attempt $i failed, retrying..."; sleep 2; }; \
        done \
     && rm -rf /var/lib/apt/lists/* \
-    && test -f /usr/bin/chromium-headless-shell || { echo "ERROR: chromium-headless-shell not found after install"; exit 1; }
+    && test -f /usr/bin/chromium || { echo "ERROR: chromium not found after install"; exit 1; }
 
 # Chromium wrapper — adds flags required for headless rendering in Docker:
 # --no-sandbox: required for non-root or unprivileged containers
 # --disable-gpu: no GPU in container, prevents blank screenshots
 # --disable-dev-shm-usage: /dev/shm is small in Docker, use /tmp instead
 # --disable-software-rasterizer: avoids fallback to broken SW rasterizer
-RUN printf '#!/bin/bash\nexec /usr/bin/chromium-headless-shell --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer "$@"\n' \
+RUN printf '#!/bin/bash\nexec /usr/bin/chromium --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer "$@"\n' \
     > /usr/local/bin/chromium-headless && chmod +x /usr/local/bin/chromium-headless
 
-# Set Chromium path for agent-browser
+# Set Chromium path for agent-browser and Playwright (both use system chromium)
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/local/bin/chromium-headless
-ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/local/bin/chromium-headless
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-# Install agent-browser and claude-code globally
-RUN npm install -g agent-browser @anthropic-ai/claude-code
+# Install agent-browser, claude-code, and playwright globally
+RUN npm install -g agent-browser @anthropic-ai/claude-code playwright
 
 # Create app directory
 WORKDIR /app
@@ -67,6 +69,10 @@ RUN npm run build
 # Install pdf-reader CLI
 COPY skills/pdf-reader/pdf-reader /usr/local/bin/pdf-reader
 RUN chmod +x /usr/local/bin/pdf-reader
+
+# Install record-web-video CLI
+COPY skills/record-web-video/record-web-video /usr/local/bin/record-web-video
+RUN chmod +x /usr/local/bin/record-web-video
 
 # Create workspace directories
 RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input

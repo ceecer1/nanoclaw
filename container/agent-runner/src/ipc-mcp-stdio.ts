@@ -99,6 +99,42 @@ server.tool(
 );
 
 server.tool(
+  'send_video',
+  "Send a video file to the user in the chat. Use after recording a browser session with record-web-video. The file must be in /workspace/group.",
+  {
+    file_path: z.string().describe('Path to the video file, relative to /workspace/group (e.g. "recording.webm") or absolute'),
+    caption: z.string().optional().describe('Optional caption to send with the video'),
+    sender: z.string().optional().describe('Your role/identity name. When set, video appears from a dedicated bot in Telegram.'),
+  },
+  async (args) => {
+    const absPath = args.file_path.startsWith('/')
+      ? args.file_path
+      : path.join('/workspace/group', args.file_path);
+
+    if (!fs.existsSync(absPath)) {
+      return {
+        content: [{ type: 'text' as const, text: `File not found: ${absPath}` }],
+        isError: true,
+      };
+    }
+
+    const data: Record<string, string | undefined> = {
+      type: 'video',
+      chatJid,
+      filePath: absPath,
+      caption: args.caption,
+      sender: args.sender || undefined,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    };
+
+    writeIpcFile(MESSAGES_DIR, data);
+
+    return { content: [{ type: 'text' as const, text: 'Video queued for sending.' }] };
+  },
+);
+
+server.tool(
   'schedule_task',
   `Schedule a recurring or one-time task. The task will run as a full agent with access to all tools. Returns the task ID for future reference. To modify an existing task, use update_task instead.
 
