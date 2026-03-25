@@ -2,11 +2,15 @@ import os from 'os';
 import path from 'path';
 
 import { readEnvFile } from './env.js';
+import { isValidTimezone } from './timezone.js';
 
 // Read config values from .env (falls back to process.env).
-// Secrets (API keys, tokens) are NOT read here — they are loaded only
-// by the credential proxy (credential-proxy.ts), never exposed to containers.
-const envConfig = readEnvFile(['ASSISTANT_NAME', 'ASSISTANT_HAS_OWN_NUMBER']);
+const envConfig = readEnvFile([
+  'ASSISTANT_NAME',
+  'ASSISTANT_HAS_OWN_NUMBER',
+  'ONECLI_URL',
+  'TZ',
+]);
 
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
@@ -47,10 +51,8 @@ export const CONTAINER_MAX_OUTPUT_SIZE = parseInt(
   process.env.CONTAINER_MAX_OUTPUT_SIZE || '10485760',
   10,
 ); // 10MB default
-export const CREDENTIAL_PROXY_PORT = parseInt(
-  process.env.CREDENTIAL_PROXY_PORT || '3001',
-  10,
-);
+export const ONECLI_URL =
+  process.env.ONECLI_URL || envConfig.ONECLI_URL || 'http://localhost:10254';
 export const IPC_POLL_INTERVAL = 1000;
 // How long to wait before auto-retrying after a Claude rate-limit error (ms)
 export const RATE_LIMIT_RETRY_MS = parseInt(
@@ -72,10 +74,20 @@ export const TRIGGER_PATTERN = new RegExp(
   'i',
 );
 
-// Timezone for scheduled tasks (cron expressions, etc.)
-// Uses system timezone by default
-export const TIMEZONE =
-  process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+// Timezone for scheduled tasks, message formatting, etc.
+// Validates each candidate is a real IANA identifier before accepting.
+function resolveConfigTimezone(): string {
+  const candidates = [
+    process.env.TZ,
+    envConfig.TZ,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ];
+  for (const tz of candidates) {
+    if (tz && isValidTimezone(tz)) return tz;
+  }
+  return 'UTC';
+}
+export const TIMEZONE = resolveConfigTimezone();
 
 // Telegram bot pool for agent swarms (comma-separated tokens)
 const envPoolConfig = readEnvFile(['TELEGRAM_BOT_POOL']);
