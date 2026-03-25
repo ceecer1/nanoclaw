@@ -290,7 +290,10 @@ export async function sendPoolVideo(
     return;
   }
 
-  logger.warn({ chatId }, 'sendPoolVideo called but no pool/main bot available');
+  logger.warn(
+    { chatId },
+    'sendPoolVideo called but no pool/main bot available',
+  );
 }
 
 export async function sendMainVideo(
@@ -602,11 +605,19 @@ export class TelegramChannel implements Channel {
     }
   }
 
-  async sendPhoto(jid: string, filePath: string, caption?: string): Promise<void> {
+  async sendPhoto(
+    jid: string,
+    filePath: string,
+    caption?: string,
+  ): Promise<void> {
     await sendMainPhoto(jid, filePath, caption);
   }
 
-  async sendVideo(jid: string, filePath: string, caption?: string): Promise<void> {
+  async sendVideo(
+    jid: string,
+    filePath: string,
+    caption?: string,
+  ): Promise<void> {
     await sendMainVideo(jid, filePath, caption);
   }
 }
